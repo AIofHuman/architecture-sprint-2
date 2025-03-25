@@ -1,0 +1,181 @@
+version: '3.7'
+
+services:
+  # Config Server (stores metadata about the cluster)
+  configSvr:
+    image: mongo:latest
+    container_name: configSrv
+    restart: always
+    volumes:
+      - configsvr_data:/data/configdb
+    ports:
+      - "27017:27017"
+    networks:
+      - mongo-cluster
+    command: --configsvr --replSet configrs --bind_ip_all --port 27017
+    healthcheck:
+      test: [ "CMD", "mongosh", "--eval", "db.adminCommand('ping').ok" ]
+      interval: 5s
+      start_period: 10s
+
+  # Shard 1
+  shard1_primary:
+    image: mongo:latest
+    container_name: shard1_primary
+    restart: always
+    depends_on:
+      - configSvr
+    volumes:
+      - shard1_primary_data:/data/db
+    ports:
+      - "27018:27018"
+    networks:
+      - mongo-cluster
+    command: mongod --shardsvr --replSet shard1rs --bind_ip_all --port 27018
+
+  # Shard 1 - Secondary 1
+  shard1_secondary1:
+    image: mongo:latest
+    container_name: shard1_secondary1
+    restart: always
+    depends_on:
+      - shard1_primary
+    ports:
+      - "27028:27018"
+    volumes:
+      - shard1_secondary1_data:/data/db
+    networks:
+      - mongo-cluster
+    command: mongod --shardsvr --replSet shard1rs --bind_ip_all --port 27018
+
+  # Shard 1 - Secondary 2
+  shard1_secondary2:
+    image: mongo:latest
+    container_name: shard1_secondary2
+    restart: always
+    depends_on:
+      - shard1_primary
+    ports:
+      - "27038:27018"
+    volumes:
+      - shard1_secondary2_data:/data/db
+    networks:
+      - mongo-cluster
+    command: mongod --shardsvr --replSet shard1rs --bind_ip_all --port 27018
+
+  # Shard 2
+  shard2_primary:
+    image: mongo:latest
+    container_name: shard2_primary
+    restart: always
+    depends_on:
+      - configSvr
+    volumes:
+      - shard2_primary_data:/data/db
+    ports:
+      - "27019:27019"
+    networks:
+      - mongo-cluster
+    command: mongod --shardsvr --replSet shard2rs --bind_ip_all --port 27019
+
+  # Shard 2 - Secondary 1
+  shard2_secondary1:
+    image: mongo:latest
+    container_name: shard2_secondary1
+    restart: always
+    depends_on:
+      - shard2_primary
+    ports:
+      - "27029:27019"
+    volumes:
+      - shard2_secondary1_data:/data/db
+    networks:
+      - mongo-cluster
+    command: mongod --shardsvr --replSet shard2rs --bind_ip_all --port 27019
+
+  # Shard 2 - Secondary 1
+  shard2_secondary2:
+    image: mongo:latest
+    container_name: shard2_secondary2
+    restart: always
+    depends_on:
+      - shard2_primary
+    ports:
+      - "27039:27019"
+    volumes:
+      - shard2_secondary2_data:/data/db
+    networks:
+      - mongo-cluster
+    command: mongod --shardsvr --replSet shard2rs --bind_ip_all --port 27019
+
+  # Mongos Router (routes queries to the appropriate shard)
+  mongos_router:
+    image: mongo:latest
+    container_name: mongos_router
+    restart: always
+    ports:
+      - "27020:27020"
+    depends_on:
+      - configSvr
+      - shard1_primary
+      - shard2_primary
+    networks:
+      - mongo-cluster
+    command: mongos --configdb configrs/configsvr:27017 --bind_ip_all --port 27020
+    healthcheck:
+      test: [ "CMD", "pgrep", "mongos" ]
+      interval: 5s
+      start_period: 10s
+
+  # API application
+  pymongo_api:
+    container_name: pymongo_api
+    restart: always
+    build:
+      context: api_app
+      dockerfile: Dockerfile
+    image: kazhem/pymongo_api:1.0.0
+    depends_on:
+      - mongos_router
+    ports:
+      - 8080:8080
+    environment:
+      MONGODB_URL: "mongodb://mongos_router:27020"
+      MONGODB_DATABASE_NAME: "somedb"
+    networks:
+      - mongo-cluster
+
+  # Redis Server (for caching requests)
+  redis:
+    image: redis:latest
+    restart: always
+    container_name: redis
+    depends_on:
+      - mongos_router
+    ports:
+      - "6379:6379"
+    environment:
+      REDIS_URL: "redis://redis:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - mongo-cluster
+    healthcheck:
+      test: [ "CMD", "redis-cli", "ping" ]
+      interval: 5s
+      start_period: 10s
+
+volumes:
+  configsvr_data:
+  shard1_primary_data:
+  shard1_secondary1_data:
+  shard1_secondary2_data:
+  shard2_primary_data:
+  shard2_secondary1_data:
+  shard2_secondary2_data:
+  redis_data:
+
+
+networks:
+  mongo-cluster:
+    driver: bridge
