@@ -2,19 +2,29 @@
 
 ## Как запустить
 
-Запускаем mongodb и приложение
+Запускаем mongodb шарды и приложение
 
 ```shell
 docker compose up -d
 ```
 
-Заполняем mongodb данными
+Инициируем mongodb данными
 
 ```shell
 ./scripts/mongo-init.sh
 ```
 
 ## Как проверить
+
+Проверяем скриптами
+
+```shell
+./scripts/test-shard1.sh
+```
+
+```shell
+./scripts/test-shard2.sh
+```
 
 ### Если вы запускаете проект на локальной машине
 

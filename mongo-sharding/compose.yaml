@@ -32,12 +32,8 @@ services:
     networks:
       - mongo-cluster
     command: --shardsvr --replSet shard1 --bind_ip_all --port 27018
-    # healthcheck:
-    #   test: [ "CMD", "mongosh", "--eval", "db.adminCommand('ping').ok" ]
-    #   interval: 5s
-    #   start_period: 10s
 
-    # Shard 2
+  # Shard 2
   shard2:
     image: mongo:latest
     container_name: shard2
@@ -51,12 +47,8 @@ services:
     networks:
       - mongo-cluster
     command: mongod --shardsvr --replSet shard2 --bind_ip_all --port 27019
-    # healthcheck:
-    #   test: [ "CMD", "mongosh", "--eval", "db.adminCommand('ping').ok" ]
-    #   interval: 5s
-    #   start_period: 10s
 
-    # Mongos Router (routes queries to the appropriate shard)
+  # Mongos Router (routes queries to the appropriate shard)
   mongos_router:
     image: mongo:latest
     container_name: mongos_router
@@ -88,7 +80,7 @@ services:
     ports:
       - 8080:8080
     environment:
-      MONGODB_URL: "mongodb://mongos:27020"
+      MONGODB_URL: "mongodb://mongos_router:27020"
       MONGODB_DATABASE_NAME: "somedb"
     networks:
       - mongo-cluster
